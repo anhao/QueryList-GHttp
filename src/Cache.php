@@ -9,10 +9,10 @@
 namespace Jaeger;
 
 
-use Cache\Adapter\Common\AbstractCachePool;
-use Cache\Adapter\Filesystem\FilesystemCachePool;
-use League\Flysystem\Adapter\Local;
-use League\Flysystem\Filesystem;
+
+use Symfony\Component\Cache\Adapter\AdapterInterface;
+use Symfony\Component\Cache\Adapter\FilesystemAdapter;
+use Symfony\Contracts\Cache\ItemInterface;
 
 class Cache extends GHttp
 {
@@ -25,25 +25,21 @@ class Cache extends GHttp
             return self::$name(...$arguments);
         }
         if (is_string($cacheConfig['cache'])) {
-            $filesystemAdapter = new Local($cacheConfig['cache']);
-            $filesystem        = new Filesystem($filesystemAdapter);
-            $cachePool = new FilesystemCachePool($filesystem);
-        }else if ($cacheConfig['cache'] instanceof AbstractCachePool) {
+            $cachePool = new FilesystemAdapter();
+        }else if ($cacheConfig['cache'] instanceof AdapterInterface) {
             $cachePool = $cacheConfig['cache'];
         }
 
         $cacheKey = self::getCacheKey($name,$arguments);
-        $data = $cachePool->get($cacheKey);
-        if(empty($data)) {
-            $data = self::$name(...$arguments);
-            if(!empty($data)) {
-                $cachePool->set($cacheKey,$data,$cacheConfig['cache_ttl']);
-            }
-        }
-        return $data;
+        return $cachePool->get($cacheKey,function (ItemInterface $item)use($cacheConfig,$name,$arguments){
+             $item->expiresAfter($cacheConfig['cache_ttl']);
+             $data = self::$name($arguments);
+             $item->set($data);
+             return $item;
+         });
     }
 
-    protected static function initCacheConfig($arguments)
+    protected static function initCacheConfig($arguments): array
     {
         $cacheConfig = [
             'cache' => null,
@@ -58,7 +54,7 @@ class Cache extends GHttp
         return $cacheConfig;
     }
 
-    protected static function getCacheKey($name, $arguments)
+    protected static function getCacheKey($name, $arguments): string
     {
         return md5($name.'_'.json_encode($arguments));
     }

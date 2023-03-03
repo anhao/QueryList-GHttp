@@ -1,16 +1,23 @@
 {
-    "name": "jaeger/g-http",
+    "name": "alapi/g-http",
     "description": "Simple Http client base on GuzzleHttp",
     "license": "MIT",
     "authors": [
         {
             "name": "Jaeger",
             "email": "JaegerCode@gmail.com"
+        },
+        {
+            "name": "ALAPI",
+            "email": "im@alone88.cn",
+            "homepage": "https://www..alapi.cn"
         }
     ],
     "require": {
-        "cache/filesystem-adapter": "^1",
-        "guzzlehttp/guzzle": "^6.0 | ^7.0"
+        "php": ">=8.0",
+        "guzzlehttp/guzzle": "^6.0 | ^7.0",
+        "symfony/cache": "^6.0",
+        "ext-json": "*"
     },
     "autoload":{
         "psr-4":{
