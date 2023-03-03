@@ -9,13 +9,20 @@
 namespace Jaeger;
 
 
-
-use Symfony\Component\Cache\Adapter\AdapterInterface;
-use Symfony\Component\Cache\Adapter\FilesystemAdapter;
-use Symfony\Contracts\Cache\ItemInterface;
+use Cache\Adapter\Common\AbstractCachePool;
+use Cache\Adapter\Filesystem\FilesystemCachePool;
+use League\Flysystem\Adapter\Local;
+use League\Flysystem\Filesystem;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\Local\LocalFilesystemAdapter;
+use Psr\SimpleCache\InvalidArgumentException;
 
 class Cache extends GHttp
 {
+    /**
+     * @throws FilesystemException
+     * @throws InvalidArgumentException
+     */
     public static function remember($name, $arguments)
     {
         $cachePool = null;
@@ -25,21 +32,24 @@ class Cache extends GHttp
             return self::$name(...$arguments);
         }
         if (is_string($cacheConfig['cache'])) {
-            $cachePool = new FilesystemAdapter();
-        }else if ($cacheConfig['cache'] instanceof AdapterInterface) {
+            $filesystemAdapter = new LocalFilesystemAdapter($cacheConfig['cache']);
+            $cachePool = new FilesystemCachePool($filesystemAdapter);
+        }else if ($cacheConfig['cache'] instanceof AbstractCachePool) {
             $cachePool = $cacheConfig['cache'];
         }
 
         $cacheKey = self::getCacheKey($name,$arguments);
-        return $cachePool->get($cacheKey,function (ItemInterface $item)use($cacheConfig,$name,$arguments){
-             $item->expiresAfter($cacheConfig['cache_ttl']);
-             $data = self::$name($arguments);
-             $item->set($data);
-             return $item;
-         });
+        $data = $cachePool->get($cacheKey);
+        if(empty($data)) {
+            $data = self::$name(...$arguments);
+            if(!empty($data)) {
+                $cachePool->set($cacheKey,$data,$cacheConfig['cache_ttl']);
+            }
+        }
+        return $data;
     }
 
-    protected static function initCacheConfig($arguments): array
+    protected static function initCacheConfig($arguments)
     {
         $cacheConfig = [
             'cache' => null,
@@ -54,7 +64,7 @@ class Cache extends GHttp
         return $cacheConfig;
     }
 
-    protected static function getCacheKey($name, $arguments): string
+    protected static function getCacheKey($name, $arguments)
     {
         return md5($name.'_'.json_encode($arguments));
     }
