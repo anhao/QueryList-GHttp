@@ -4,7 +4,7 @@
 ## 安装
 
 ```
-composer require jaeger/g-http
+composer require alapi/g-http
 ```
 
 ## 用法
